@@ -1,4 +1,5 @@
 const net = require("net");
+const parser = require("./parser.js");
 
 class Request {
     constructor(options) {
@@ -42,18 +43,17 @@ class Request {
             const parser = new ResponseParser;
             connection.on('data', (data) => {
                 console.log(data.toString());
-/**
-week02/client.js:38
-HTTP/1.1 200 OK
-Content-Type: text/html
-Date: Mon, 10 Aug 2020 15:09:42 GMT
-Connection: keep-alive
-Transfer-Encoding: chunked
-
-34
-Hello name=egbert&age=111&url=http%3A%2F%2Fbaidu.com
-0
- */
+                /**
+                week02/client.js:38
+                HTTP/1.1 200 OK
+                Content-Type: text/html
+                Date: Mon, 10 Aug 2020 15:09:42 GMT
+                Connection: keep-alive
+                Transfer-Encoding: chunked
+                34
+                Hello name=egbert&age=111&url=http%3A%2F%2Fbaidu.com
+                0
+                 */
                 parser.receive(data.toString());
                 if (parser.isFinished) {
                     resolve(parser.response);
@@ -75,11 +75,11 @@ Hello name=egbert&age=111&url=http%3A%2F%2Fbaidu.com
         // Date: Mon, 10 Aug 2020 15:17:35 GMT
         // Connection: keep-alive
         // Transfer-Encoding: chunked
-        
+
         // 34
         // Hello name=egbert&age=111&url=http%3A%2F%2Fbaidu.com
         // 0
-              
+
         let stream = [
             `${this.method} ${this.path} HTTP/1.1\r\n`,
             ...Object.keys(this.headers).map(key => `${key}: ${this.headers[key]}\r\n`),
@@ -94,9 +94,9 @@ Hello name=egbert&age=111&url=http%3A%2F%2Fbaidu.com
  */
 class ResponseParser {
     constructor() {
-        this.WAITING_STATUS_LINE = 0;//构建 status line 状态 （HTTP/1.1 200 OK）
-        this.WAITING_STATUS_LINE_END = 1;//构建 status line 完成状态
-        this.WAITING_HEADER_NAME = 2;//
+        this.WAITING_STATUS_LINE = 0; //构建 status line 状态 （HTTP/1.1 200 OK）
+        this.WAITING_STATUS_LINE_END = 1; //构建 status line 完成状态
+        this.WAITING_HEADER_NAME = 2; //
         this.WAITING_HEADER_SPACE = 3;
         this.WAITING_HEADER_VALUE = 4;
         this.WAITING_HEADER_LINE_END = 5;
@@ -129,50 +129,50 @@ class ResponseParser {
         }
     }
     receiveChar(char) {
-        if (this.current === this.WAITING_STATUS_LINE) {//构建STATUS_LINE行
-            if (char === '\r') {//识别到第一个回车符代表构建STATUS_LINE结束
-                this.current = this.WAITING_STATUS_LINE_END;//当前状态置为STATUS_LINE_END
-            } else {//未识别到回车之前，把属于STATUS_LINE的字符保存到变量
+        if (this.current === this.WAITING_STATUS_LINE) { //构建STATUS_LINE行
+            if (char === '\r') { //识别到第一个回车符代表构建STATUS_LINE结束
+                this.current = this.WAITING_STATUS_LINE_END; //当前状态置为STATUS_LINE_END
+            } else { //未识别到回车之前，把属于STATUS_LINE的字符保存到变量
                 this.statusLine += char;
             }
         } else if (this.current === this.WAITING_STATUS_LINE_END) {
-            if (char === '\n') {//识别到第一个换行，构造headname开始。（Content-Type）
+            if (char === '\n') { //识别到第一个换行，构造headname开始。（Content-Type）
                 this.current = this.WAITING_HEADER_NAME;
             }
         } else if (this.current === this.WAITING_HEADER_NAME) {
-            if (char === ':') {//识别到冒号，构建headname技术，构建冒号后空格开始
+            if (char === ':') { //识别到冒号，构建headname技术，构建冒号后空格开始
                 this.current = this.WAITING_HEADER_SPACE;
-            } else if (char === '\r') {//多次返回构建head对象完成后，会有一个空行，识别到空行的回车符，则head构建完毕，置为HEADER_BLOCK_END状态
+            } else if (char === '\r') { //多次返回构建head对象完成后，会有一个空行，识别到空行的回车符，则head构建完毕，置为HEADER_BLOCK_END状态
                 this.current = this.WAITING_HEADER_BLOCK_END;
-                if (this.headers['Transfer-Encoding'] === 'chunked') {//此处默认Transfer-Encoding为chunked模式，构建bodyParser
-                    this.bodyParser = new TrunkedBodyParser();//创建bodyParser
+                if (this.headers['Transfer-Encoding'] === 'chunked') { //此处默认Transfer-Encoding为chunked模式，构建bodyParser
+                    this.bodyParser = new TrunkedBodyParser(); //创建bodyParser
                 }
-            } else {//构建到headname冒号之前，属于headname的字符保存到对应变量
+            } else { //构建到headname冒号之前，属于headname的字符保存到对应变量
                 this.headerName += char;
             }
-        } else if (this.current === this.WAITING_HEADER_SPACE) {//构建headname冒号后的空格开始
-            if (char === ' ') {//识别到空格，状态置为开始构建headvalue(text/html)
+        } else if (this.current === this.WAITING_HEADER_SPACE) { //构建headname冒号后的空格开始
+            if (char === ' ') { //识别到空格，状态置为开始构建headvalue(text/html)
                 this.current = this.WAITING_HEADER_VALUE;
             }
-        } else if (this.current === this.WAITING_HEADER_VALUE) {//构建headvalue开始
-            if (char === '\r') {//识别到换行符，构建headvalue结束，组装成headers变量，并置空headerName，headerValue
+        } else if (this.current === this.WAITING_HEADER_VALUE) { //构建headvalue开始
+            if (char === '\r') { //识别到换行符，构建headvalue结束，组装成headers变量，并置空headerName，headerValue
                 this.headers[this.headerName] = this.headerValue;
                 this.headerName = "";
                 this.headerValue = "";
-                this.current = this.WAITING_HEADER_LINE_END;//构建HEADER_LINE结束
-            } else {//识别到换行之前，对应字符存进headvalue变量
+                this.current = this.WAITING_HEADER_LINE_END; //构建HEADER_LINE结束
+            } else { //识别到换行之前，对应字符存进headvalue变量
                 this.headerValue += char;
             }
-        } else if (this.current === this.WAITING_HEADER_LINE_END) {//HEADER_LINE包括Content-Type，Date，Connection，Transfer-Encoding等多行，返回状态headername继续构建
+        } else if (this.current === this.WAITING_HEADER_LINE_END) { //HEADER_LINE包括Content-Type，Date，Connection，Transfer-Encoding等多行，返回状态headername继续构建
             if (char === '\n') {
                 this.current = this.WAITING_HEADER_NAME;
             }
         } else if (this.current === this.WAITING_HEADER_BLOCK_END) {
-            if (char === '\n') {//识别到head外城后的换行符，则到等待body完成状态
+            if (char === '\n') { //识别到head外城后的换行符，则到等待body完成状态
                 this.current = this.WAITING_BODY;
             }
         } else if (this.current === this.WAITING_BODY) {
-            this.bodyParser.receiveChar(char);//调用bodyParser编译body部分
+            this.bodyParser.receiveChar(char); //调用bodyParser编译body部分
         }
     }
 }
@@ -180,10 +180,10 @@ class ResponseParser {
  * chunke模式编译body部分，状态机
  */
 class TrunkedBodyParser {
-//body部分结构如下，由16进制数字开始，16进制0结束，第一个16进制数是表示的body的字符数的16进制表示
-// 34
-// Hello name=egbert&age=111&url=http%3A%2F%2Fbaidu.com
-// 0
+    //body部分结构如下，由16进制数字开始，16进制0结束
+    // 34
+    // Hello name=egbert&age=111&url=http%3A%2F%2Fbaidu.com
+    // 0
     constructor() {
         this.WAITING_LENGTH = 0;
         this.WAITING_LENGTH_LINE_END = 1;
@@ -193,17 +193,17 @@ class TrunkedBodyParser {
         this.length = 0;
         this.content = [];
         this.isFinished = false;
-        this.current = this.WAITING_LENGTH;//从WAITING_LENGTH状态开始
+        this.current = this.WAITING_LENGTH; //从WAITING_LENGTH状态开始
     }
 
     receiveChar(char) {
         if (this.current === this.WAITING_LENGTH) {
             if (char === '\r') {
                 this.current = this.WAITING_LENGTH_LINE_END;
-                if (this.length === 0) {//
+                if (this.length === 0) {
                     this.isFinished = true;
                 }
-            } else {//把第一行16进制的数字转化成10进制
+            } else {
                 this.length *= 16;
                 this.length += parseInt(char, 16);
             }
@@ -211,13 +211,13 @@ class TrunkedBodyParser {
             if (char === '\n') {
                 this.current = this.READING_TRUNK;
             }
-        } else if (this.current === this.READING_TRUNK) {//开始编译body正文
-            if (this.length !== 0) {//body内容长度不为0则把字符放进内容数组
+        } else if (this.current === this.READING_TRUNK) {
+            if (this.length !== 0) {
                 this.content.push(char);
             }
-            if (this.content.length === this.length) {//content数组长度等于字符串总长度的时候，则所有字符串编译完成
+            if (this.content.length === this.length) {
                 this.current = this.WAITING_NEW_LINE;
-                this.length = 0;//状态置回新换行状态，length置为0用作判断编译finish
+                this.length = 0;
             }
         } else if (this.current === this.WAITING_NEW_LINE) {
             if (char === '\r') {
@@ -253,4 +253,7 @@ void async function () {
     let response = await request.send();
     //打印response
     console.log(response);
+    let dom = parser.parseHTML(response.body);
+
+    console.log(dom);
 }();
